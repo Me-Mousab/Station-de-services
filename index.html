@@ -7,8 +7,14 @@
     
     <!-- CSS Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- MarkerCluster CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -384,6 +390,7 @@
                 width: 60px;
             }
         }
+        
     </style>
 </head>
 <body>
@@ -479,7 +486,7 @@
 
     <!-- JS Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
         // ============================================
         // CONFIGURATION
@@ -703,7 +710,7 @@
         // ============================================
         function processGeoJSON(data) {
             allFeatures = data.features || [];
-            
+
             if (allFeatures.length === 0) {
                 showError('Le fichier GeoJSON ne contient aucune donnée');
                 return;
@@ -715,25 +722,57 @@
                 societesList.add(societe.trim());
             });
 
+            // Supprimer ancien layer si existe
+            if (stationsLayer) {
+                map.removeLayer(stationsLayer);
+            }
+
+            // Supprimer ancien cluster si existe
+            if (markers) {
+                map.removeLayer(markers);
+            }
+
+            // Créer le groupe de clusters
+            var markers = L.markerClusterGroup({
+                maxClusterRadius: 80,        // Rayon max du cluster en pixels
+                disableClusteringAtZoom: 15, // Zoom à partir duquel on désactive le clustering
+                spiderfyOnMaxZoom: true,     // Déplier les clusters au zoom max
+                showCoverageOnHover: true,  // Désactiver la surbrillance au survol
+                zoomToBoundsOnClick: true,    // Zoomer sur le cluster au clic
+                removeOutsideVisibleBounds: false,   // Désactiver le clustering pour certains marqueurs
+    
+            });
+
             // Créer la couche GeoJSON
             stationsLayer = L.geoJSON(data, {
                 pointToLayer: function (feature, latlng) {
                     const etat = feature.properties.ETAT || '';
-                    const color = etat === 'EN PROJET' ? '#f1c40f' : etat === 'EN SERVICE' ? '#2ecc71' : '#151fdf';
-                    
-                    return L.circleMarker(latlng, {
-                        radius: 8,
-                        fillColor: color,
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8,
-                        interactive: true  // ✅ Important pour le tactile
+                    const color =
+                        etat === 'EN PROJET' ? '#f1c40f' : etat === 'EN SERVICE' ? '#2ecc71' : '#151fdf';
+
+                    // Utiliser un marker HTML au lieu de circleMarker
+                    return L.marker(latlng, {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `
+                                <div class="marker-dot" style="
+                                    background:${color};
+                                    width:14px;
+                                    height:14px;
+                                    border-radius:50%;
+                                    border:2px solid white;
+                                    box-shadow:0 0 4px rgba(0,0,0,0.4);
+                                "></div>
+                            `,
+                            iconSize: [18, 18],
+                            iconAnchor: [9, 9]
+                        })
                     });
                 },
+
                 onEachFeature: function (feature, layer) {
                     const props = feature.properties;
-                    
+
                     const popupContent = `
                         <div class="popup-header">
                             <i class="fas fa-gas-pump"></i> ${props.SOCIETE || 'N/A'}
@@ -753,32 +792,45 @@
                             </div>
                             <div class="popup-row">
                                 <span class="popup-label">État:</span>
-                                <span class="status-badge ${ props.ETAT === 'EN PROJET' ? 'status-projet' : props.ETAT === 'EN SERVICE' ? 'status-service' : 'status-examen'}">
+                                <span class="status-badge ${
+                                    props.ETAT === 'EN PROJET'
+                                        ? 'status-projet'
+                                        : props.ETAT === 'EN SERVICE'
+                                        ? 'status-service'
+                                        : 'status-examen'
+                                }">
                                     ${props.ETAT || 'N/A'}
                                 </span>
                             </div>
                         </div>
                     `;
-                    
+
                     layer.bindPopup(popupContent);
-                    
-                    // ✅ Amélioration tactile : popup au clic (pas au survol sur mobile)
-                    layer.on('click', function (e) {
-                        // Fermer les autres popups
-                        map.eachLayer(function(l) {
-                            if (l !== this && l.getPopup) {
+
+                    // Ajouter chaque station au cluster
+                    markers.addLayer(layer);
+
+                    // Gestion tactile / clic
+                    layer.on('click', function () {
+                        map.eachLayer(function (l) {
+                            if (l !== layer && l.getPopup) {
                                 l.closePopup();
                             }
-                        }, this);
-                        this.openPopup();
+                        });
+
+                        layer.openPopup();
                     });
                 }
-            }).addTo(map);
+            });
 
-            // Ajuster la vue
-            if (allFeatures.length > 0) {
-                const group = new L.featureGroup(stationsLayer.getLayers());
-                map.fitBounds(group.getBounds(), { padding: [50, 50] });
+            // Ajouter les clusters à la carte
+            map.addLayer(markers);
+
+            // Ajuster la vue sur les clusters
+            if (markers.getLayers().length > 0) {
+                map.fitBounds(markers.getBounds(), {
+                    padding: [50, 50]
+                });
             }
 
             generateFilters();
