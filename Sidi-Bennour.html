@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Carte Interactive - Stations de Services Sidi Bennour</title>
+    
+    <!-- CSS Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- MarkerCluster CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            touch-action: manipulation;
+        }
+        
+        #map { 
+            height: 100vh; 
+            width: 100%; 
+            z-index: 1; 
+            touch-action: none; /* Important pour le drag sur mobile */
+        }
+
+        /* ============================================
+           PANNEAU DE CONTRÔLE - MOBILE OPTIMISÉ
+           ============================================ */
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            max-width: 90vw;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 85vh;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        /* Bouton toggle mobile */
+        .panel-toggle {
+            display: none;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            touch-action: manipulation;
+        }
+
+        .control-panel h3 { 
+            margin-top: 0; 
+            color: #2c3e50; 
+            border-bottom: 3px solid #e74c3c; 
+            padding-bottom: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            font-size: 16px;
+        }
+
+        .control-panel h4 {
+            color: #34495e;
+            margin: 15px 0 8px 0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* Recherche */
+        .search-container { 
+            margin-bottom: 15px; 
+            position: relative; 
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 10px 40px 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #e74c3c;
+        }
+        
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        .search-btn:active {
+            background: #c0392b;
+        }
+
+        /* Filtres - Scroll optimisé mobile */
+        .checkbox-container {
+            max-height: 180px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 6px;
+            background: #fafafa;
+            -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
+        }
+        
+        .checkbox-container::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .checkbox-container::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 2px;
+        }
+        
+        .checkbox-container label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+            padding: 4px;
+            border-radius: 4px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .checkbox-container label:active {
+            background: #e8e8e8;
+        }
+        
+        .checkbox-container input { 
+            margin-right: 8px; 
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            touch-action: manipulation;
+            min-width: 16px; /* Évite le redimensionnement sur mobile */
+        }
+
+        /* Statistiques */
+        .stats {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 20px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+
+        /* Légende */
+        .legend { 
+            margin-top: 15px; 
+            font-size: 12px; 
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .legend-item { 
+            display: flex; 
+            align-items: center; 
+            margin-bottom: 6px; 
+        }
+        
+        .dot { 
+            height: 12px; 
+            width: 12px; 
+            border-radius: 50%; 
+            display: inline-block; 
+            margin-right: 10px; 
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+
+        /* Loading */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #e74c3c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Message d'erreur */
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #c00;
+            max-width: 90vw;
+        }
+
+        /* Popup personnalisé - Mobile friendly */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .leaflet-popup-content {
+            margin: 0;
+            padding: 0;
+            width: 240px !important;
+            max-width: 90vw;
+        }
+        
+        .popup-header {
+            background: #e74c3c;
+            color: white;
+            padding: 10px 12px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .popup-body {
+            padding: 12px;
+        }
+        
+        .popup-row {
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        
+        .popup-label {
+            font-weight: bold;
+            color: #7f8c8d;
+            display: inline-block;
+            width: 65px;
+        }
+        
+        .popup-value {
+            color: #2c3e50;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .status-service { background: #2ecc71; }
+        .status-projet { background: #f1c40f; color: #333; }
+        .status-examen { background: #151fdf;  }
+
+        /* ============================================
+           RESPONSIVE MOBILE
+           ============================================ */
+        @media (max-width: 768px) {
+            .control-panel {
+                width: 95vw;
+                right: 50%;
+                transform: translateX(50%);
+                top: 10px;
+                max-height: 75vh;
+                font-size: 14px;
+            }
+
+            .control-panel.collapsed {
+                transform: translateX(50%) translateY(-120%);
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .panel-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .panel-toggle.active {
+                background: #2ecc71;
+            }
+
+            .checkbox-container {
+                max-height: 150px;
+            }
+
+            /* Ajuster les popups sur mobile */
+            .leaflet-popup-tip-container {
+                margin-top: -1px;
+            }
+
+            /* Boutons plus grands pour le tactile */
+            .search-btn,
+            .panel-toggle {
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            /* Espacement pour éviter les clics accidentels */
+            .checkbox-container label {
+                padding: 8px 4px;
+                min-height: 30px;
+            }
+        }
+
+        /* Pour les très petits écrans */
+        @media (max-width: 480px) {
+            .control-panel {
+                padding: 12px;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .popup-label {
+                width: 60px;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- Écran de chargement -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <h3>Chargement des données...</h3>
+        <p style="color: #7f8c8d; margin-top: 10px; font-size: 14px;">Fichier: Station de services.geojson</p>
+    </div>
+
+    <!-- Bouton toggle panel (mobile) -->
+    <button class="panel-toggle" id="panelToggle" title="Afficher/Masquer le panneau" onclick="togglePanel()">
+        <i class="fas fa-sliders-h"></i>
+    </button>
+
+    <!-- Panneau de contrôle -->
+    <div class="control-panel" id="controlPanel">
+        <h3><i class="fas fa-gas-pump"></i> Stations de Services</h3>
+        <p style="color: #7f8c8d; font-size: 12px; margin-top: 5px;">Province d'El Jadida, Maroc</p>
+        
+        <!-- Recherche -->
+        <h4><i class="fas fa-search"></i> Recherche</h4>
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="Nom, adresse, ville...">
+            <button onclick="searchStation()" class="search-btn"><i class="fas fa-search"></i></button>
+        </div>
+
+        <!-- Filtres par Société -->
+        <h4><i class="fas fa-filter"></i> Filtrer par Société</h4>
+        <div id="filtersContainer" class="checkbox-container">
+            <p style="color: #999; text-align: center; padding: 20px;">Chargement...</p>
+        </div>
+
+        <!-- Filtres par État -->
+        <h4><i class="fas fa-toggle-on"></i> Filtrer par État</h4>
+        <!-- ✅ CORRECTION: ID unique pour ce conteneur -->
+        <div id="etatFiltersContainer" class="checkbox-container" style="max-height: 100px;">
+            <label>
+                <input type="checkbox" value="EN SERVICE" checked onchange="applyFilters()"> 
+                <span class="status-badge status-service">EN SERVICE</span>
+            </label>
+            <label>
+                <input type="checkbox" value="EN PROJET" checked onchange="applyFilters()"> 
+                <span class="status-badge status-projet">EN PROJET</span>
+            </label>
+            <label>
+                <input type="checkbox" value="EN EXAMEN" checked onchange="applyFilters()"> 
+                <span class="status-badge status-examen">EN EXAMEN</span>
+            </label>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalStations">0</div>
+                <div class="stat-label">Total Stations</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="totalSocietes">0</div>
+                <div class="stat-label">Sociétés</div>
+            </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="legend">
+            <h4 style="margin-top: 0; font-size: 13px;"><i class="fas fa-info-circle"></i> Légende</h4>
+            <div class="legend-item">
+                <span class="dot" style="background:#2ecc71;"></span>
+                <span>En Service</span>
+            </div>
+            <div class="legend-item">
+                <span class="dot" style="background:#f1c40f;"></span>
+                <span>En Projet</span>
+            </div>
+            <div class="legend-item">
+                <span class="dot" style="background:#151fdf;"></span>
+                <span>En Examen</span>
+            </div>
+            <div class="legend-item">
+                <span class="dot" style="background:#e690f5; border-color:#e690f5;"></span>
+                <span>Limites communales</span>
+            </div>
+            <div class="legend-item">
+                <span class="dot" style="background:#e74c3c;"></span>
+                <span>Sélectionné</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- La carte -->
+    <div id="map"></div>
+
+    <!-- JS Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const GEOJSON_FILE = 'Station de services Sidi Bennour.geojson';
+        const COMMUNES_FILE = 'Communes.geojson';
+        let stationsLayer;
+        let communesLayer;
+        let allFeatures = [];
+        let societesList = new Set();
+
+        // ============================================
+        // INITIALISATION DE LA CARTE
+        // ============================================
+        const map = L.map('map', {
+            tap: true,              // Support tactile
+            touchZoom: true,        // Zoom pincé
+            scrollWheelZoom: true,  // Zoom molette
+            doubleClickZoom: true,
+            boxZoom: false,         // Désactiver boxZoom sur mobile
+            keyboard: false,
+            dragging: true
+        }).setView([33.24, -8.50], 10);
+
+        // Fonds de carte
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            detectRetina: true  // Meilleure qualité sur écrans haute densité
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri',
+            detectRetina: true
+        });
+
+        const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CartoDB',
+            detectRetina: true
+        });
+
+        osmLayer.addTo(map);
+
+        // ✅ Charger les communes ET les stations en parallèle
+        Promise.all([
+            loadCommunes(),
+            //loadGeoJSON()  // Votre fonction existante
+        ]).then(([communesLoaded]) => {
+            // Ajouter les communes au contrôle de calques si chargées
+            if (communesLoaded) {
+                communesLoaded.addTo(map);  // Afficher par défaut
+                updateLayerControl(communesLoaded);
+            }
+        }).catch(err => {
+            console.error('Erreur lors du chargement des couches:', err);
+        });
+
+        // ============================================
+        // MISE À JOUR DU CONTRÔLE DE CALQUES
+        // ============================================
+        let layerControl;  // Variable globale pour le contrôle
+
+        function updateLayerControl(communesLayer) {
+            // Supprimer l'ancien contrôle s'il existe
+            if (layerControl) {
+                map.removeControl(layerControl);
+            }
+            
+            // Créer les overlays pour le contrôle
+            const overlays = {
+                "<i class='fas fa-gas-pump'></i> Stations": stationsLayer
+            };
+            
+            // Ajouter les communes si disponibles
+            if (communesLayer) {
+                overlays["<i class='fas fa-map'></i> Communes"] = communesLayer;
+            }
+            
+            // Recréer le contrôle avec les nouvelles options
+            layerControl = L.control.layers({
+                "OpenStreetMap": osmLayer,
+                "Satellite": satelliteLayer,
+                "Mode Sombre": darkLayer
+            }, overlays, { 
+                position: 'topleft',
+                collapsed: true,
+                autoZIndex: true
+            }).addTo(map);
+        }
+
+        // Contrôleur de calques - Position adaptée mobile
+        /*L.control.layers({
+            "OpenStreetMap": osmLayer,
+            "Satellite": satelliteLayer,
+            "Mode Sombre": darkLayer
+        }, null, { 
+            position: 'topleft',
+            collapsed: true
+        }).addTo(map);*/
+
+        // ============================================
+        // TOGGLE PANEL MOBILE
+        // ============================================
+        function togglePanel() {
+            const panel = document.getElementById('controlPanel');
+            const toggle = document.getElementById('panelToggle');
+            panel.classList.toggle('collapsed');
+            toggle.classList.toggle('active');
+            
+            // Mettre à jour l'icône
+            const icon = toggle.querySelector('i');
+            if (panel.classList.contains('collapsed')) {
+                icon.className = 'fas fa-sliders-h';
+            } else {
+                icon.className = 'fas fa-times';
+            }
+        }
+
+        // ============================================
+        // CHARGEMENT DU FICHIER COMMUNES.GEOJSON
+        // ============================================
+        async function loadCommunes() {
+            try {
+                const response = await fetch(COMMUNES_FILE);
+                if (!response.ok) {
+                    console.warn('Communes: fichier non trouvé, couche désactivée');
+                    return null;
+                }
+                const data = await response.json();
+                
+                // Créer la couche GeoJSON pour les communes
+                communesLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        return {
+                            color: '#e690f5',        // Couleur bordure
+                            weight: 1.5,             // Épaisseur bordure
+                            opacity: 0.7,            // Opacité bordure
+                            fillColor: '#e690f5',    // Couleur remplissage
+                            fillOpacity: 0.15        // Opacité remplissage (transparent)
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const props = feature.properties;
+                        const nom = props.NOM || 'Inconnu';
+                        const province = props.Province || 'N/A';
+                        const type = props.Type || 'Commune';
+                        
+                        const popupContent = `
+                            <div class="popup-header" style="background : #e690f5;">
+                                <i class="fas fa-map-marked-alt"></i> ${nom}
+                            </div>
+                            <div class="popup-body">
+                                <div class="popup-row">
+                                    <span class="popup-label">Province:</span>
+                                    <span class="popup-value">${province}</span>
+                                </div>
+                                <div class="popup-row">
+                                    <span class="popup-label">Type:</span>
+                                    <span class="popup-value">${type}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        layer.bindPopup(popupContent);
+                        
+                        // Effets au survol
+                        layer.on({
+                            mouseover: function(e) {
+                                this.setStyle({
+                                    weight: 3,
+                                    fillOpacity: 0.3,
+                                    color: '#470170'
+                                });
+                            },
+                            mouseout: function(e) {
+                                communesLayer.resetStyle(this);
+                            }
+                        });
+                    }
+                });
+                
+                console.log('Communes chargées:', data.features?.length || 0, 'entités');
+                return communesLayer;
+                
+            } catch (error) {
+                console.error('Erreur chargement communes:', error);
+                return null;
+            }
+        }
+
+        // ============================================
+        // CHARGEMENT DU FICHIER GEOJSON
+        // ============================================
+        async function loadGeoJSON() {
+            try {
+                const response = await fetch(GEOJSON_FILE);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Données chargées:', data);
+                
+                processGeoJSON(data);
+                hideLoader();
+                
+            } catch (error) {
+                console.error('Erreur de chargement:', error);
+                showError(`
+                    <strong>Erreur de chargement</strong><br><br>
+                    • Fichier non trouvé dans le même dossier<br>
+                    • Utilisez un serveur local (Live Server)<br>
+                    • Vérifiez la console (F12)<br><br>
+                    <em>Sur GitHub Pages : renommez le fichier sans espaces</em>
+                `);
+            }
+        }
+
+        // ============================================
+        // TRAITEMENT DES DONNÉES
+        // ============================================
+        function processGeoJSON(data) {
+            allFeatures = data.features || [];
+
+            if (allFeatures.length === 0) {
+                showError('Le fichier GeoJSON ne contient aucune donnée');
+                return;
+            }
+
+            // Collecter toutes les sociétés uniques
+            allFeatures.forEach(feature => {
+                const societe = feature.properties.SOCIETE || 'Inconnu';
+                societesList.add(societe.trim());
+            });
+
+            // Supprimer ancien layer si existe
+            if (stationsLayer) {
+                map.removeLayer(stationsLayer);
+            }
+
+            // Supprimer ancien cluster si existe
+            if (markers) {
+                map.removeLayer(markers);
+            }
+
+            // Créer le groupe de clusters
+            var markers = L.markerClusterGroup({
+                maxClusterRadius: 80,        // Rayon max du cluster en pixels
+                disableClusteringAtZoom: 15, // Zoom à partir duquel on désactive le clustering
+                spiderfyOnMaxZoom: true,     // Déplier les clusters au zoom max
+                showCoverageOnHover: true,  // Désactiver la surbrillance au survol
+                zoomToBoundsOnClick: true,    // Zoomer sur le cluster au clic
+                removeOutsideVisibleBounds: false,   // Désactiver le clustering pour certains marqueurs
+    
+            });
+
+            // Créer la couche GeoJSON
+            stationsLayer = L.geoJSON(data, {
+                pointToLayer: function (feature, latlng) {
+                    const etat = feature.properties.ETAT || '';
+                    const color =
+                        etat === 'EN PROJET' ? '#f1c40f' : etat === 'EN SERVICE' ? '#2ecc71' : '#151fdf';
+
+                    // Utiliser un marker HTML au lieu de circleMarker
+                    return L.marker(latlng, {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `
+                                <div class="marker-dot" style="
+                                    background:${color};
+                                    width:14px;
+                                    height:14px;
+                                    border-radius:50%;
+                                    border:2px solid white;
+                                    box-shadow:0 0 4px rgba(0,0,0,0.4);
+                                "></div>
+                            `,
+                            iconSize: [18, 18],
+                            iconAnchor: [9, 9]
+                        })
+                    });
+                },
+
+                onEachFeature: function (feature, layer) {
+                    const props = feature.properties;
+
+                    const popupContent = `
+                        <div class="popup-header">
+                            <i class="fas fa-gas-pump"></i> ${props.SOCIETE || 'N/A'}
+                        </div>
+                        <div class="popup-body">
+                            <div class="popup-row">
+                                <span class="popup-label">Adresse:</span>
+                                <span class="popup-value">${props.ADRESSE || 'N/A'}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Province:</span>
+                                <span class="popup-value">${props.PROVINCE || 'N/A'}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Type:</span>
+                                <span class="popup-value">${props.TYPE || 'N/A'}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">État:</span>
+                                <span class="status-badge ${
+                                    props.ETAT === 'EN PROJET'
+                                        ? 'status-projet'
+                                        : props.ETAT === 'EN SERVICE'
+                                        ? 'status-service'
+                                        : 'status-examen'
+                                }">
+                                    ${props.ETAT || 'N/A'}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+
+                    layer.bindPopup(popupContent);
+
+                    // Ajouter chaque station au cluster
+                    markers.addLayer(layer);
+
+                    // Gestion tactile / clic
+                    layer.on('click', function () {
+                        map.eachLayer(function (l) {
+                            if (l !== layer && l.getPopup) {
+                                l.closePopup();
+                            }
+                        });
+
+                        layer.openPopup();
+                    });
+                }
+            });
+
+            // Ajouter les clusters à la carte
+            map.addLayer(markers);
+
+            // Ajuster la vue sur les clusters
+            if (markers.getLayers().length > 0) {
+                map.fitBounds(markers.getBounds(), {
+                    padding: [50, 50]
+                });
+            }
+
+            generateFilters();
+            updateStats();
+        }
+
+        // ============================================
+        // GÉNÉRATION DES FILTRES
+        // ============================================
+        function generateFilters() {
+            const container = document.getElementById('filtersContainer');
+            container.innerHTML = '';
+
+            const sortedSocietes = Array.from(societesList).sort();
+
+            sortedSocietes.forEach(societe => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label>
+                        <input type="checkbox" value="${societe}" checked onchange="applyFilters()"> 
+                        ${societe}
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // ✅ CORRECTION : APPLICATION DES FILTRES
+        // ============================================
+        function applyFilters() {
+            // Récupérer les sociétés cochées
+            const checkedSocietes = Array.from(
+                document.querySelectorAll('#filtersContainer input[type="checkbox"]:checked')
+            ).map(cb => cb.value.trim());
+
+            // ✅ CORRECTION: Utiliser l'ID unique au lieu de nth-child
+            const checkedEtats = Array.from(
+                document.querySelectorAll('#etatFiltersContainer input[type="checkbox"]:checked')
+            ).map(cb => cb.value.trim());
+
+            // Si aucun filtre sélectionné, tout masquer (sécurité)
+            if (checkedSocietes.length === 0 || checkedEtats.length === 0) {
+                stationsLayer.eachLayer(function(layer) {
+                    if (map.hasLayer(layer)) {
+                        map.removeLayer(layer);
+                    }
+                });
+                return;
+            }
+
+            // Appliquer les filtres
+            stationsLayer.eachLayer(function(layer) {
+                const feature = layer.feature;
+                const societe = (feature.properties.SOCIETE || '').trim();
+                const etat = (feature.properties.ETAT || '').trim();
+
+                const societeMatch = checkedSocietes.includes(societe);
+                const etatMatch = checkedEtats.includes(etat);
+
+                if (societeMatch && etatMatch) {
+                    if (!map.hasLayer(layer)) {
+                        map.addLayer(layer);
+                    }
+                } else {
+                    if (map.hasLayer(layer)) {
+                        map.removeLayer(layer);
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // RECHERCHE
+        // ============================================
+        function searchStation() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            if (query === '') {
+                alert('Veuillez entrer un terme de recherche');
+                return;
+            }
+
+            let foundCount = 0;
+
+            stationsLayer.eachLayer(function(layer) {
+                const props = layer.feature.properties;
+                const searchFields = [
+                    props.SOCIETE,
+                    props.ADRESSE,
+                    props.PROVINCE,
+                    props.URBAIN
+                ].filter(v => v).join(' ').toLowerCase();
+
+                // Réinitialiser le style
+                layer.setStyle({ 
+                    fillColor: props.ETAT === 'EN PROJET' ? '#f1c40f' : '#2ecc71',
+                    radius: 8,
+                    weight: 2
+                });
+
+                if (searchFields.includes(query)) {
+                    foundCount++;
+                    
+                    if (foundCount === 1) {
+                        map.flyTo(layer.getLatLng(), 14, {
+                            animate: true,
+                            duration: 1.5
+                        });
+                        layer.openPopup();
+                    }
+                    
+                    // Mettre en évidence
+                    layer.setStyle({ 
+                        fillColor: '#e74c3c', 
+                        radius: 12,
+                        weight: 3
+                    });
+                }
+            });
+
+            if (foundCount === 0) {
+                alert(`Aucun résultat pour "${query}"`);
+            }
+        }
+
+        // ============================================
+        // STATISTIQUES
+        // ============================================
+        function updateStats() {
+            document.getElementById('totalStations').textContent = allFeatures.length;
+            document.getElementById('totalSocietes').textContent = societesList.size;
+        }
+
+        // ============================================
+        // UTILITAIRES
+        // ============================================
+        function hideLoader() {
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function showError(message) {
+            const loader = document.getElementById('loader');
+            loader.innerHTML = `
+                <div class="error-message">${message}</div>
+                <button onclick="location.reload()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; touch-action: manipulation;">
+                    <i class="fas fa-redo"></i> Réessayer
+                </button>
+            `;
+        }
+
+        // ============================================
+        // ÉVÉNEMENTS
+        // ============================================
+        // Recherche avec Entrée
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchStation();
+            }
+        });
+
+        // Empêcher le zoom double-tap sur mobile (conflit avec Leaflet)
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // ============================================
+        // DÉMARRAGE
+        // ============================================
+        loadGeoJSON();
+
+    </script>
+</body>
+</html>
